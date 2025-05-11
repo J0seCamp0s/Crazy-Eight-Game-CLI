@@ -9,14 +9,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Base64;
+import java.util.Collections;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 
 public class Game {
-
+    private List<User> userList = new ArrayList<>();
     private List<Player> playerList = new ArrayList<>(){};
-    private HashMap<String, String> flags = new HashMap<>();
+    private List<Card> drawPile = new ArrayList<>();
 
     public Game() {
         
@@ -74,6 +75,8 @@ public class Game {
                     System.out.println("Aborting, please try again.");
                     return;
                 }
+
+                startNewGame(flags[2]);
             }
             //Get order of players
             case "--order"->{}
@@ -168,12 +171,13 @@ public class Game {
     }
 
     private void editUser(String userName, String gameName, Boolean mode) {
-        
+        //Validate game directory exists and that it is a directory
         if(!validateDirectoryPath(gameName)) {
+            System.out.println("Aborting user addition/deletion, please try again.");
             return;
         }
 
-        //Retreive admin password from console
+        //Compare input password with stored password for admin
         System.out.println("Adding a user is a priviledge operation, requires admin permissions");
         if(!comparePasswords("admin", gameName)) {
             System.out.println("Aborting user addition/deletion, please try again.");
@@ -198,7 +202,7 @@ public class Game {
             try {
                 editFile("\n"+ userName + "," + userPassword, gameName + "//users.txt", true);
             } catch (Exception IOException) {
-                System.out.println("Error! Add new user to users.txt file!");
+                System.out.println("Error! Could not add new user to users.txt file!");
                 System.out.println("Aborting user addition/deletion, please try again.");
                 return;
             }
@@ -215,29 +219,27 @@ public class Game {
         File gameDirectory = new File(gameName);
         if(!gameDirectory.exists()) {
             System.out.println(String.format("Error! Directory for game %s does not exist yet!", gameName));
-            System.out.println("Aborting player addition, please try again.");
             return false;
 
         //Check if path to directory actually points to a directory
         } else if(!gameDirectory.isDirectory()) {
             System.out.println(String.format("Error! %s is not a directory!", gameName));
-            System.out.println("Aborting player addition, please try again.");
             return false;
         }
         return true;
     }
 
     private Boolean comparePasswords(String userName, String gameName) {
+        //Retrive userName password from console
         String consoleAdminPassword = getHashPassword(userName);
 
         //Check if retrieval and hashing was successful
         if(consoleAdminPassword == null) { 
             System.out.println(String.format("Error! Couldn't retrive hashed password for %s user!", userName));
-            
             return false;
         }
 
-        //Retrieve admin password from users.txt
+        //Retrieve userName password from users.txt
         String fileAdminPassword = retrievePasswordFromFile("admin", gameName);
 
         //Check if retrieval was successful
@@ -254,33 +256,125 @@ public class Game {
         return true;
     }
 
-    private String[] getUsers(String gameName) {
+    private Boolean getUsers(String gameName) {
+        //Retreive users from users.txt
         String userCredentials = readFile(gameName + "//users.txt");
         if(userCredentials.isEmpty()) {
             System.out.println(String.format("Error! Couldn't open users.txt file for game %s", gameName));
-            return null;
+            return false;
         }
+
+        //Split userCredentials, one element per line
         String[] users = userCredentials.split("\n");
-        return users;
+        for(String user : users) {
+            userList.add(new User(user));
+        }
+        return true;
+    }
+
+    private Boolean validateUserName(String newName) {
+        return true;
     }
 
     private String retrievePasswordFromFile(String userName, String gameName) {
+        //Set userPassword to null as default
+        //Value is null if password was not found
         String userPassword = null;
-        String[] users = getUsers(gameName);
-
-        if(users == null || users.length == 0) {
+        
+        //Retrieve users from users.txt and validate the file exists and that is not empty
+        if(!getUsers(gameName) || userList.size() == 0) {
             System.out.println(String.format("Error! Couldn't retrieve users for game %s", gameName));
         }
 
-        for(String user: users) {
-            Integer comaIndex = user.indexOf(",");
-            String currentUserName = user.substring(0, comaIndex);
-            if(currentUserName.equals(userName)) {
-                userPassword = user.substring(comaIndex+1, user.length());
+        //Find password for user with name == userName
+        for(User user: userList) {
+            if(user.getName().equals(userName)) {
+                userPassword = user.getPasswordHash();
                 break;
             }
         }
         return userPassword;
+    }
+
+    private void startNewGame(String gameName) {
+        //Validate game directory exists and that it is a directory
+        if(!validateDirectoryPath(gameName)) {
+            System.out.println("Aborting game start process, please try again.");
+            return;
+        }
+
+        //Compare input password with stored password for admin
+        System.out.println("Adding a user is a priviledge operation, requires admin permissions");
+        if(!comparePasswords("admin", gameName)) {
+            System.out.println("Aborting game start process, please try again.");
+            return;
+        }
+
+        if(!getUsers(gameName)) {
+            System.out.println("Aborting game start process, please try again.");
+            return;
+        } 
+
+        if(userList.size() > 3) {
+            System.out.println("Error! At least two users need to be registered in the users.txt file (excluding the admin)!");
+            System.out.println("Aborting game start process, please try again.");
+            return;
+        }
+        
+        List<Card> deck = generateDeck();
+
+        //Add players to playerList
+        for(int i = 1; i < userList.size(); i++) {
+            List<Card> playerHand = deck.subList(0, 4);
+            playerList.add(new Player(userList.get(i),playerHand));
+        }
+
+        if(!writePlayersToFiles(gameName)) {
+            System.out.println("Aborting game start process, please try again.");
+            return;
+        }
+
+        if(!addCardToDiscardPile(deck.getFirst().toString())) {
+            System.out.println("Aborting game start process, please try again.");
+            return;
+        }
+    }
+
+    private Boolean writePlayersToFiles(String gameName) {
+        for(int i = 0; i < playerList.size(); i++) {
+            String playerString = playerList.get(i).toString();
+            playerString += "\n#" + String.valueOf(i);
+            try {
+                editFile(playerString, gameName + "//" + playerList.get(i).getName() + ".txt", false);
+            } catch (Exception e) {
+                System.out.println(String.format("Error! Could not create %s.txt file!", playerList.get(i).getName()));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Boolean addCardToDiscardPile(String discardCard) {
+        return true;
+    }
+
+    private List<Card> generateDeck() {
+        List<Card> deck = new ArrayList<>();
+        for(String value: CardStaticValue.VALUES) {
+            deck.add(new Card(value, CardStaticValue.CLUBS));
+        }
+        for(String value: CardStaticValue.VALUES) {
+            deck.add(new Card(value, CardStaticValue.DIAMONDS));
+        }
+        for(String value: CardStaticValue.VALUES) {
+            deck.add(new Card(value, CardStaticValue.HEARTS));
+        }
+        for(String value: CardStaticValue.VALUES) {
+            deck.add(new Card(value, CardStaticValue.SPADES));
+        }
+
+        Collections.shuffle(deck);
+        return deck;
     }
 
     private Boolean checkTurn() {

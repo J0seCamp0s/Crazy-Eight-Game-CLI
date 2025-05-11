@@ -1,10 +1,11 @@
 public abstract class CardStaticValue {
-    public static final String CLUBS = "CLUBS";
-    public static final String DIAMONDS = "DIAMONDS";
-    public static final String HEARTS = "HEARTS";
-    public static final String SPADES = "SPADES";
+    public static final String CLUBS = "C";
+    public static final String DIAMONDS = "D";
+    public static final String HEARTS = "H";
+    public static final String SPADES = "S";
 
-    public static final Integer MAX_NUMB_VAL = 10;
-    public static final Integer MIN_NUMB_VAL = 1;
-    public static final String[] LETTER_VALUES = {"A", "J", "Q", "K"};
+    public static final String[] VALUES = { 
+        "2", "3", "4", "5", "6", 
+        "7", "8", "9", "0", 
+        "A", "J", "Q", "K"};
 }
