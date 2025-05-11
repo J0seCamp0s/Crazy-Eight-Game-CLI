@@ -23,7 +23,7 @@ public class Card{
     }
 
     public String toString() {
-        String cardString = value + "," + suit;
+        String cardString = value + suit;
         return cardString;
     }
 }

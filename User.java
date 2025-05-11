@@ -1,6 +1,6 @@
 public class User {
-    private String name;
-    private String passworddHash;
+    protected String name;
+    protected String passworddHash;
 
     public User(String userString) {
         Integer comaIndex = userString.indexOf(",");
